@@ -8,7 +8,8 @@ from src.schema import Posting
 WEBHOOK_URL_ENV = "DISCORD_WEBHOOK_URL"
 BATCH_SIZE = 10
 SLEEP_SECONDS = 1
-DISCORD_CONTENT_LIMIT = 2000
+DISCORD_EMBED_TOTAL_LIMIT = 6000
+EMBED_COLOR = 0x5865F2  # Discord blurple
 
 
 def send(postings: list[Posting]) -> list[str]:
@@ -21,9 +22,8 @@ def send(postings: list[Posting]) -> list[str]:
     sent_ids = []
     for i, batch in enumerate(batches):
         try:
-            response = httpx.post(
-                webhook_url, json={"content": _format_message(batch)}, timeout=10
-            )
+            embeds = [_format_embed(posting) for posting in batch]
+            response = httpx.post(webhook_url, json={"embeds": embeds}, timeout=10)
             response.raise_for_status()
         except httpx.HTTPError:
             break
@@ -35,27 +35,54 @@ def send(postings: list[Posting]) -> list[str]:
 
 
 def _make_batches(postings: list[Posting]) -> list[list[Posting]]:
-    """Groups of up to BATCH_SIZE, closed early if adding the next posting
-    would push the formatted message over Discord's content length limit."""
+    """Groups of up to BATCH_SIZE embeds (Discord's per-message embed cap),
+    closed early if adding the next embed would push the message's combined
+    embed content over Discord's 6000-char total limit."""
     batches = []
     current: list[Posting] = []
+    current_length = 0
     for posting in postings:
-        candidate = current + [posting]
+        embed_length = _embed_length(_format_embed(posting))
         if current and (
-            len(candidate) > BATCH_SIZE or len(_format_message(candidate)) > DISCORD_CONTENT_LIMIT
+            len(current) >= BATCH_SIZE
+            or current_length + embed_length > DISCORD_EMBED_TOTAL_LIMIT
         ):
             batches.append(current)
-            current = [posting]
-        else:
-            current = candidate
+            current = []
+            current_length = 0
+        current.append(posting)
+        current_length += embed_length
     if current:
         batches.append(current)
     return batches
 
 
-def _format_message(postings: list[Posting]) -> str:
-    lines = [
-        f"**{posting.company}** — {posting.title} ({posting.location})\n{posting.url}"
-        for posting in postings
-    ]
-    return "\n\n".join(lines)
+def _format_embed(posting: Posting) -> dict:
+    return {
+        "title": posting.title,
+        "url": posting.url,
+        "author": {"name": posting.company},
+        "color": EMBED_COLOR,
+        "fields": [
+            {"name": "Location", "value": posting.location, "inline": True},
+            {"name": "Term", "value": ", ".join(posting.terms), "inline": True},
+        ],
+        "footer": {"text": _footer_text(posting)},
+    }
+
+
+def _footer_text(posting: Posting) -> str:
+    if not posting.first_seen_at:
+        return "First seen unknown"
+    return f"First seen {posting.first_seen_at.strftime('%Y-%m-%d %H:%M UTC')}"
+
+
+def _embed_length(embed: dict) -> int:
+    """Discord's own formula for the 6000-char total-embed-content limit:
+    title + description + every field's name+value + footer.text + author.name."""
+    length = len(embed.get("title", "")) + len(embed.get("description", ""))
+    length += len(embed.get("footer", {}).get("text", ""))
+    length += len(embed.get("author", {}).get("name", ""))
+    for field in embed.get("fields", []):
+        length += len(field.get("name", "")) + len(field.get("value", ""))
+    return length

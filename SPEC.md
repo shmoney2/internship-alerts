@@ -108,11 +108,16 @@ class Posting(BaseModel):
     url: str
     source: str
     posted_at: datetime | None
+    first_seen_at: datetime | None
     active: bool
     terms: list[str]
     degrees: list[str]
     raw: str
 ```
+
+`first_seen_at` is `None` on a freshly-parsed `Posting` (the source doesn't know it) and is only
+ever populated when a `Posting` is reconstructed from the database by `get_unalerted()` — `store.py`
+always computes its own timestamp at insert time and never trusts a caller-supplied value.
 
 Exposes `normalize(s: str) -> str` and `canonical_id(company, title, location) -> str`.
 
@@ -191,13 +196,18 @@ separate hand-labeled table of `(active, terms, degrees)` combinations covering 
 `send(postings) -> list[str]` — posts to the Discord webhook, returns IDs successfully
 sent.
 
-- Batch into groups of 10 per message to avoid rate limits
+- Batch into groups of up to 10 embeds per message (Discord's per-message embed cap),
+  closed early if adding the next embed would push the message over Discord's 6000-char
+  combined-embed content limit
 - Sleep 1s between messages
 - On HTTP error, return successfully-sent IDs only; do not raise
-- Message format: company, title, location, and the URL as a plain link
+- Message format: one Discord embed per posting — `title` is the posting title, linked
+  via `url` to the application; `author.name` is the company; `fields` are Location and
+  Term (all of `posting.terms`, joined, not just the configured target term); `footer.text`
+  shows `first_seen_at`
 
-**Done means:** a test with a mocked HTTP client asserts correct batching and that a
-mid-batch failure still returns the IDs sent before it.
+**Done means:** a test with a mocked HTTP client asserts correct batching (including the
+length-based early split) and that a mid-batch failure still returns the IDs sent before it.
 
 ### `run.py`
 
