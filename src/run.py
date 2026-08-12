@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from datetime import datetime, timezone
 
@@ -68,6 +69,27 @@ def _append_metrics(record: dict, metrics_path: str) -> None:
         f.write(json.dumps(record) + "\n")
 
 
+def load_dotenv(path: str = ".env") -> None:
+    """Set env vars from a KEY=VALUE .env file. Never overrides a var that's
+    already set, so real secrets (e.g. injected by GitHub Actions) always win
+    over the local file. Missing file is a silent no-op."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        return
+
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    load_dotenv()
     main()

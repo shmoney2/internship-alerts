@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 
@@ -183,3 +184,48 @@ class TestMainFetchFailure:
         )
 
         assert called == []
+
+
+class TestLoadDotenv:
+    def test_sets_vars_from_file(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(os, "environ", {})
+        env_file = tmp_path / ".env"
+        env_file.write_text("DISCORD_WEBHOOK_URL=https://discord.example/webhook\n")
+
+        run.load_dotenv(str(env_file))
+
+        assert os.environ["DISCORD_WEBHOOK_URL"] == "https://discord.example/webhook"
+
+    def test_does_not_override_existing_env_var(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(os, "environ", {"DISCORD_WEBHOOK_URL": "real-value"})
+        env_file = tmp_path / ".env"
+        env_file.write_text("DISCORD_WEBHOOK_URL=from-dotenv\n")
+
+        run.load_dotenv(str(env_file))
+
+        assert os.environ["DISCORD_WEBHOOK_URL"] == "real-value"
+
+    def test_missing_file_is_a_noop(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(os, "environ", {})
+
+        run.load_dotenv(str(tmp_path / "does-not-exist.env"))
+
+        assert os.environ == {}
+
+    def test_ignores_blank_lines_and_comments(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(os, "environ", {})
+        env_file = tmp_path / ".env"
+        env_file.write_text("\n# a comment\nFOO=bar\n\n# another\nBAZ=qux\n")
+
+        run.load_dotenv(str(env_file))
+
+        assert os.environ == {"FOO": "bar", "BAZ": "qux"}
+
+    def test_strips_surrounding_quotes(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(os, "environ", {})
+        env_file = tmp_path / ".env"
+        env_file.write_text('FOO="bar baz"\nQUX=\'quux\'\n')
+
+        run.load_dotenv(str(env_file))
+
+        assert os.environ == {"FOO": "bar baz", "QUX": "quux"}
