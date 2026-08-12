@@ -24,6 +24,25 @@ def make_posting(n: int) -> Posting:
     )
 
 
+def make_long_posting(n: int, title_length: int = 300) -> Posting:
+    company = f"Company{n}"
+    title = "X" * title_length
+    location = "Remote"
+    return Posting(
+        id=canonical_id(company, title, location) + f"-{n}",
+        company=company,
+        title=title,
+        location=location,
+        url=f"https://example.com/jobs/{n}",
+        source="simplify",
+        posted_at=None,
+        active=True,
+        terms=["Summer 2027"],
+        degrees=[],
+        raw="{}",
+    )
+
+
 class FakeResponse:
     def __init__(self, status_code=200):
         self.status_code = status_code
@@ -165,3 +184,46 @@ class TestSend:
         monkeypatch.delenv(notify.WEBHOOK_URL_ENV, raising=False)
         with pytest.raises(KeyError):
             notify.send([make_posting(0)])
+
+
+class TestMakeBatches:
+    def test_short_postings_still_batch_by_ten(self):
+        postings = [make_posting(i) for i in range(25)]
+        batches = notify._make_batches(postings)
+        assert [len(b) for b in batches] == [10, 10, 5]
+
+    def test_no_batch_exceeds_the_discord_content_limit(self):
+        # 8 long postings: 10-per-batch would exceed 2000 chars, so this
+        # must split into more than one batch even though count < BATCH_SIZE.
+        postings = [make_long_posting(i) for i in range(8)]
+        batches = notify._make_batches(postings)
+
+        assert len(batches) > 1
+        for batch in batches:
+            assert len(notify._format_message(batch)) <= notify.DISCORD_CONTENT_LIMIT
+
+    def test_length_split_batches_still_respect_batch_size_cap(self):
+        postings = [make_long_posting(i) for i in range(30)]
+        batches = notify._make_batches(postings)
+        for batch in batches:
+            assert len(batch) <= notify.BATCH_SIZE
+
+    def test_every_posting_is_included_exactly_once(self):
+        postings = [make_long_posting(i) for i in range(30)]
+        batches = notify._make_batches(postings)
+        flattened = [p for batch in batches for p in batch]
+        assert flattened == postings
+
+    def test_oversized_batch_no_longer_fails_against_discord_content_rules(self, monkeypatch):
+        # Reproduces the real 400 seen in production: a fixed 10-per-batch
+        # split put too many long postings in one message.
+        postings = [make_long_posting(i) for i in range(8)]
+        fake_post = make_fake_post()
+        monkeypatch.setattr(httpx, "post", fake_post)
+
+        result = notify.send(postings)
+
+        assert result == [p.id for p in postings]
+        assert len(fake_post.calls) > 1
+        for call in fake_post.calls:
+            assert len(call["json"]["content"]) <= notify.DISCORD_CONTENT_LIMIT

@@ -8,6 +8,7 @@ from src.schema import Posting
 WEBHOOK_URL_ENV = "DISCORD_WEBHOOK_URL"
 BATCH_SIZE = 10
 SLEEP_SECONDS = 1
+DISCORD_CONTENT_LIMIT = 2000
 
 
 def send(postings: list[Posting]) -> list[str]:
@@ -15,7 +16,7 @@ def send(postings: list[Posting]) -> list[str]:
         return []
 
     webhook_url = os.environ[WEBHOOK_URL_ENV]
-    batches = [postings[i : i + BATCH_SIZE] for i in range(0, len(postings), BATCH_SIZE)]
+    batches = _make_batches(postings)
 
     sent_ids = []
     for i, batch in enumerate(batches):
@@ -31,6 +32,25 @@ def send(postings: list[Posting]) -> list[str]:
             time.sleep(SLEEP_SECONDS)
 
     return sent_ids
+
+
+def _make_batches(postings: list[Posting]) -> list[list[Posting]]:
+    """Groups of up to BATCH_SIZE, closed early if adding the next posting
+    would push the formatted message over Discord's content length limit."""
+    batches = []
+    current: list[Posting] = []
+    for posting in postings:
+        candidate = current + [posting]
+        if current and (
+            len(candidate) > BATCH_SIZE or len(_format_message(candidate)) > DISCORD_CONTENT_LIMIT
+        ):
+            batches.append(current)
+            current = [posting]
+        else:
+            current = candidate
+    if current:
+        batches.append(current)
+    return batches
 
 
 def _format_message(postings: list[Posting]) -> str:
