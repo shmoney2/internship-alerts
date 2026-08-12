@@ -234,6 +234,19 @@ re-alerts nothing already delivered and loses nothing not yet delivered.
 GitHub Actions, cron every 30 minutes. The SQLite file is committed back to the repo by
 the action, or stored via actions cache — pick one and document it.
 
+**Decision: commit back to the repo.** `actions/cache` entries can be evicted (LRU once a
+repo's total cache exceeds 10GB, or after 7 days unused) — for a 7-day continuous run this
+would probably survive since every 30-minute run keeps touching it, but "probably" isn't
+good enough for state whose loss directly violates the spec's own zero-duplicate-alerts
+success criterion: an evicted cache means a fresh empty DB, which means every currently-
+eligible posting gets re-alerted. A committed SQLite file can't be silently evicted.
+`metrics.jsonl` is committed back for the same reason — the spec calls it "impossible to
+reconstruct later," so it gets the same durability guarantee as the alert-dedup state.
+
+The workflow force-adds both (`git add -f`) since they're gitignored for local dev — that
+keeps a stray local `git add -A` from ever sweeping up a developer's local `postings.db`,
+while still letting the CI job's own commit include it explicitly and intentionally.
+
 Secrets: `DISCORD_WEBHOOK_URL` in repo secrets. Never in code.
 
 > 30 minutes, not 1 minute. The source repo updates in batches; polling faster gains
