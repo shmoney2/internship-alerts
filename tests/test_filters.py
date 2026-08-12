@@ -1,10 +1,11 @@
 import pytest
 
+from src import config
 from src.filters import is_eligible
 from src.schema import Posting, canonical_id
 
 
-def make_posting(title: str) -> Posting:
+def make_posting(title: str, active=True, terms=None, degrees=None) -> Posting:
     company = "Acme"
     location = "Remote"
     return Posting(
@@ -15,6 +16,9 @@ def make_posting(title: str) -> Posting:
         url="https://example.com/job",
         source="simplify",
         posted_at=None,
+        active=active,
+        terms=terms if terms is not None else [config.TARGET_TERM],
+        degrees=degrees if degrees is not None else [],
         raw="{}",
     )
 
@@ -114,3 +118,67 @@ class TestIsEligible:
     def test_table_has_at_least_5_tricky_negatives(self):
         negatives = [t for t in LABELED_TITLES if t[1] is False and t[2] is not None]
         assert len(negatives) >= 5
+
+
+# (active, terms, degrees, expected, why) — title is always "Software Engineer
+# Intern" so rules 4-8 never fire; these isolate rules 1-3 only. Several are
+# drawn directly from tests/fixtures/simplify.json (indices noted below).
+STRUCTURAL_CASES = [
+    (True, ["Summer 2027"], [], True, "clearly eligible baseline"),
+    (True, ["Summer 2027"], ["Bachelor's"], True, "Bachelor's explicitly listed"),
+    (
+        True,
+        ["Summer 2027"],
+        ["Bachelor's", "Master's", "PhD"],
+        True,
+        "Bachelor's among options despite PhD also listed",
+    ),
+    (
+        False,
+        ["Spring 2026"],
+        [],
+        False,
+        "fixture[0] GE Vernova: inactive listing rejected regardless of term/degree",
+    ),
+    (
+        False,
+        [
+            "Winter 2027", "Spring 2027", "Summer 2027", "Fall 2027",
+            "Winter 2028", "Spring 2028", "Summer 2028", "Fall 2028",
+            "Winter 2029", "Spring 2029", "Summer 2029",
+        ],
+        [],
+        False,
+        "fixture[41] T. Rowe Price: terms include Summer 2027, but inactive",
+    ),
+    (
+        True,
+        ["Spring 2026"],
+        ["PhD"],
+        False,
+        "fixture[7] ByteDance Research Scientist: active, but wrong term "
+        "(Spring 2026, not Summer 2027)",
+    ),
+    (
+        True,
+        ["Summer 2027"],
+        ["PhD"],
+        False,
+        "fixture[58] ByteDance AI Perception Intern: active and correct term, "
+        "but PhD-only degrees with no Bachelor's option",
+    ),
+    (True, ["Summer 2027"], ["Master's"], False, "Master's-only, no Bachelor's option"),
+    (True, ["Summer 2027"], ["Master's", "PhD"], False, "grad-only, no Bachelor's option"),
+    (True, [], [], False, "empty terms list never matches TARGET_TERM"),
+    (True, ["Summer 2026"], [], False, "right season, wrong year"),
+    (True, ["Fall 2027"], [], False, "right year, wrong season"),
+]
+
+
+class TestIsEligibleStructuralRules:
+    @pytest.mark.parametrize("active,terms,degrees,expected,reason", STRUCTURAL_CASES)
+    def test_structural_case(self, active, terms, degrees, expected, reason):
+        posting = make_posting(
+            "Software Engineer Intern", active=active, terms=terms, degrees=degrees
+        )
+        assert is_eligible(posting) is expected, reason

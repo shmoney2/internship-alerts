@@ -29,6 +29,9 @@ def parse_listings(entries: list[dict]) -> list[Posting]:
                 url=url,
                 source="simplify",
                 posted_at=_parse_posted_at(entry.get("date_posted")),
+                active=bool(entry.get("active", False)),
+                terms=entry.get("terms") or [],
+                degrees=entry.get("degrees") or [],
                 raw=json.dumps(entry),
             )
         )

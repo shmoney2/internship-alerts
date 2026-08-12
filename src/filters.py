@@ -1,5 +1,6 @@
 import re
 
+from src import config
 from src.schema import Posting
 
 # Complete words/phrases: match on both sides so "phd" doesn't fire on
@@ -24,6 +25,15 @@ _INTERNSHIP_KEYWORDS = re.compile(r"\b(intern|internship|co-op|coop)\b", re.IGNO
 
 
 def is_eligible(posting: Posting) -> bool:
+    if not posting.active:
+        return False
+
+    if config.TARGET_TERM not in posting.terms:
+        return False
+
+    if posting.degrees and "Bachelor's" not in posting.degrees:
+        return False
+
     title = posting.title
 
     if _NEW_GRAD_FULL_TIME.search(title) and not _HAS_INTERN_WORD.search(title):

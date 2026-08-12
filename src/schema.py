@@ -18,6 +18,9 @@ class Posting(BaseModel):
     url: str
     source: str
     posted_at: datetime | None
+    active: bool
+    terms: list[str]
+    degrees: list[str]
     raw: str
 
 

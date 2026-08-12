@@ -11,6 +11,9 @@ def make_posting(
     url=None,
     source="simplify",
     posted_at=None,
+    active=True,
+    terms=None,
+    degrees=None,
     raw="{}",
     id=None,
 ):
@@ -25,6 +28,9 @@ def make_posting(
         url=url,
         source=source,
         posted_at=posted_at,
+        active=active,
+        terms=terms if terms is not None else ["Summer 2027"],
+        degrees=degrees if degrees is not None else [],
         raw=raw,
     )
 
@@ -74,6 +80,19 @@ class TestUpsert:
         store.upsert([p1, p2])
         result = store.upsert([p2, p3])
         assert result == [p3]
+
+    def test_active_terms_degrees_round_trip_through_the_database(self):
+        p = make_posting(
+            company="Acme",
+            active=False,
+            terms=["Summer 2027", "Fall 2027"],
+            degrees=["Master's", "PhD"],
+        )
+        store.upsert([p])
+        [stored] = store.get_unalerted()
+        assert stored.active is False
+        assert stored.terms == ["Summer 2027", "Fall 2027"]
+        assert stored.degrees == ["Master's", "PhD"]
 
     def test_existing_row_is_never_overwritten(self):
         original = make_posting(

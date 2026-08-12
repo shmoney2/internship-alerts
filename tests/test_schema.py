@@ -94,6 +94,9 @@ class TestPosting:
             url="https://example.com/job",
             source="simplify",
             posted_at=datetime(2026, 1, 1),
+            active=True,
+            terms=["Summer 2027"],
+            degrees=[],
             raw="{}",
         )
         assert p.company == "Acme"
@@ -108,6 +111,9 @@ class TestPosting:
             url="https://example.com/job",
             source="simplify",
             posted_at=None,
+            active=True,
+            terms=["Summer 2027"],
+            degrees=[],
             raw="{}",
         )
         assert p.posted_at is None

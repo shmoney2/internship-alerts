@@ -40,6 +40,9 @@ class TestParseListingsAgainstFixture:
         )
         assert first.source == "simplify"
         assert first.posted_at == datetime(2025, 12, 15, 21, 36, 58, tzinfo=timezone.utc)
+        assert first.active is False
+        assert first.terms == ["Spring 2026"]
+        assert first.degrees == []
 
     def test_second_entry_fields_are_correct(self):
         entries = load_fixture()
@@ -49,6 +52,20 @@ class TestParseListingsAgainstFixture:
         assert second.title == "Software Development Intern"
         assert second.location == "Markham, IL"
         assert second.posted_at == datetime(2025, 12, 17, 23, 9, 41, tzinfo=timezone.utc)
+        assert second.active is False
+        assert second.terms == ["Summer 2026"]
+        assert second.degrees == []
+
+    def test_active_true_and_nonempty_degrees_parse_correctly(self):
+        # index 7 in the fixture: ByteDance, Research Scientist Intern -
+        # Security for AI - 2026 Start; a real PhD-restricted, active listing.
+        entries = load_fixture()
+        postings = parse_listings(entries)
+        posting = postings[7]
+        assert posting.company == "ByteDance"
+        assert posting.active is True
+        assert posting.terms == ["Spring 2026"]
+        assert posting.degrees == ["PhD"]
 
     def test_id_is_canonical_not_source_id(self):
         entries = load_fixture()
@@ -118,6 +135,29 @@ class TestParseListingsSkipLogic:
         entries = [{"company_name": "Acme", "title": "SWE Intern", "url": "https://a.com/1"}]
         postings = parse_listings(entries)
         assert postings[0].posted_at is None
+
+    def test_missing_active_terms_degrees_default_sensibly(self):
+        entries = [{"company_name": "Acme", "title": "SWE Intern", "url": "https://a.com/1"}]
+        postings = parse_listings(entries)
+        assert postings[0].active is False
+        assert postings[0].terms == []
+        assert postings[0].degrees == []
+
+    def test_active_terms_degrees_map_from_entry(self):
+        entries = [
+            {
+                "company_name": "Acme",
+                "title": "SWE Intern",
+                "url": "https://a.com/1",
+                "active": True,
+                "terms": ["Summer 2027"],
+                "degrees": ["Bachelor's"],
+            }
+        ]
+        postings = parse_listings(entries)
+        assert postings[0].active is True
+        assert postings[0].terms == ["Summer 2027"]
+        assert postings[0].degrees == ["Bachelor's"]
 
 
 class TestSimplifySource:

@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import datetime, timezone
 
@@ -16,6 +17,9 @@ CREATE TABLE IF NOT EXISTS postings (
     url TEXT NOT NULL,
     source TEXT NOT NULL,
     posted_at TEXT,
+    active INTEGER NOT NULL,
+    terms TEXT NOT NULL,
+    degrees TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     alerted_at TEXT,
     raw TEXT NOT NULL
@@ -47,8 +51,9 @@ def upsert(postings: list[Posting]) -> list[Posting]:
         cursor = conn.execute(
             """
             INSERT OR IGNORE INTO postings
-                (id, company, title, location, url, source, posted_at, first_seen_at, alerted_at, raw)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                (id, company, title, location, url, source, posted_at,
+                 active, terms, degrees, first_seen_at, alerted_at, raw)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
             """,
             (
                 posting.id,
@@ -58,6 +63,9 @@ def upsert(postings: list[Posting]) -> list[Posting]:
                 posting.url,
                 posting.source,
                 posting.posted_at.isoformat() if posting.posted_at else None,
+                posting.active,
+                json.dumps(posting.terms),
+                json.dumps(posting.degrees),
                 now,
                 posting.raw,
             ),
@@ -72,7 +80,8 @@ def get_unalerted() -> list[Posting]:
     conn = _get_conn()
     rows = conn.execute(
         """
-        SELECT id, company, title, location, url, source, posted_at, raw
+        SELECT id, company, title, location, url, source, posted_at,
+               active, terms, degrees, raw
         FROM postings
         WHERE alerted_at IS NULL
         """
@@ -93,7 +102,7 @@ def mark_alerted(ids: list[str]) -> None:
 
 
 def _row_to_posting(row: tuple) -> Posting:
-    id_, company, title, location, url, source, posted_at, raw = row
+    id_, company, title, location, url, source, posted_at, active, terms, degrees, raw = row
     return Posting(
         id=id_,
         company=company,
@@ -102,5 +111,8 @@ def _row_to_posting(row: tuple) -> Posting:
         url=url,
         source=source,
         posted_at=datetime.fromisoformat(posted_at) if posted_at else None,
+        active=bool(active),
+        terms=json.loads(terms),
+        degrees=json.loads(degrees),
         raw=raw,
     )

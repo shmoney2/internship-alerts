@@ -54,6 +54,9 @@ Single table `postings`:
 | `url` | TEXT | application link |
 | `source` | TEXT | adapter name, e.g. `simplify` |
 | `posted_at` | TEXT | ISO8601, source-provided if available |
+| `active` | INTEGER | 1/0, source's `active` flag at time of ingestion |
+| `terms` | TEXT | JSON-encoded list of term strings, e.g. `["Summer 2027"]` |
+| `degrees` | TEXT | JSON-encoded list of accepted degree levels; `[]` = no restriction |
 | `first_seen_at` | TEXT | ISO8601, when we first ingested it |
 | `alerted_at` | TEXT NULL | ISO8601, when we sent an alert. NULL = never alerted |
 | `raw` | TEXT | original JSON blob from source |
@@ -105,6 +108,9 @@ class Posting(BaseModel):
     url: str
     source: str
     posted_at: datetime | None
+    active: bool
+    terms: list[str]
+    degrees: list[str]
     raw: str
 ```
 
@@ -126,7 +132,9 @@ Every future adapter implements this. That is the entire interface.
 ### `sources/simplify.py`
 
 Fetches the listings JSON, maps each entry to a `Posting`, computes canonical IDs,
-skips entries missing a URL or company.
+skips entries missing a URL or company. Also maps `active`, `terms`, and `degrees`
+directly from the source entry — all three are present on every observed entry, so
+no defensive fallback is needed there, unlike `company`/`url`.
 
 **Done means:** running against a saved fixture file (`tests/fixtures/simplify.json`,
 a real response captured once and committed) returns a known non-zero count of
@@ -152,23 +160,31 @@ returns an empty list.
 
 `is_eligible(posting) -> bool`. v1 rules, in order:
 
-1. **Reject** if title matches new-grad/full-time patterns: `new grad`, `new graduate`,
+1. **Reject** if `active` is `False`
+2. **Reject** unless `TARGET_TERM` appears in `terms`
+3. **Reject** if `degrees` is non-empty and does not contain `"Bachelor's"` (covers
+   Master's-only and PhD-only listings alike; an empty `degrees` list means no
+   restriction and passes through)
+4. **Reject** if title matches new-grad/full-time patterns: `new grad`, `new graduate`,
    `university grad`, `entry level`, `full[- ]time` — unless `intern` also appears
-2. **Reject** if title matches advanced-degree patterns: `phd`, `ph.d`, `masters only`
-3. **Reject** if title matches non-SWE intern patterns: `data scien`, `product manag`,
+5. **Reject** if title matches advanced-degree patterns: `phd`, `ph.d`, `masters only`
+6. **Reject** if title matches non-SWE intern patterns: `data scien`, `product manag`,
    `hardware`, `mechanical`, `quant`, `business`, `marketing`, `design`
-4. **Accept** if title contains `intern` or `internship` or `co-op` or `coop`
-5. Otherwise reject
+7. **Accept** if title contains `intern` or `internship` or `co-op` or `coop`
+8. Otherwise reject
 
 Case-insensitive. Regex with word boundaries, not substring matching — substring
 matching on `intern` will match "International."
 
-Config lives in a `config.py` with a `TARGET_YEAR = 2027` and `LOCATIONS: list[str] | None`
-(None = all).
+Config lives in a `config.py` with a `TARGET_YEAR = 2027`, `TARGET_TERM = f"Summer
+{TARGET_YEAR}"` (used by rule 2), and `LOCATIONS: list[str] | None` (None = all,
+currently unused by `is_eligible`).
 
 **Done means:** a test table of ~25 real titles with hand-labeled expected outcomes,
 including at least 5 tricky negatives ("Software Engineer, New Grad 2027",
-"Data Science Intern", "International Software Engineer"). All must pass.
+"Data Science Intern", "International Software Engineer"). All must pass. Plus a
+separate hand-labeled table of `(active, terms, degrees)` combinations covering rules
+1-3, drawn from real fixture examples.
 
 ### `notify.py`
 
