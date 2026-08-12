@@ -24,6 +24,7 @@ def make_posting(
         url=f"https://example.com/jobs/{pid}",
         source="simplify",
         posted_at=None,
+        first_seen_at=None,
         active=active,
         terms=terms if terms is not None else [config.TARGET_TERM],
         degrees=degrees if degrees is not None else [],

@@ -11,6 +11,7 @@ def make_posting(
     url=None,
     source="simplify",
     posted_at=None,
+    first_seen_at=None,
     active=True,
     terms=None,
     degrees=None,
@@ -28,6 +29,7 @@ def make_posting(
         url=url,
         source=source,
         posted_at=posted_at,
+        first_seen_at=first_seen_at,
         active=active,
         terms=terms if terms is not None else ["Summer 2027"],
         degrees=degrees if degrees is not None else [],
@@ -50,7 +52,10 @@ class TestInitDb:
 
         # Reconnecting to the same file must not wipe existing data.
         store.init_db(db_path)
-        assert store.get_unalerted() == [p]
+        [stored] = store.get_unalerted()
+        # first_seen_at is assigned by the store itself, so it won't match
+        # the original never-stored posting's None -- compare everything else.
+        assert stored.model_copy(update={"first_seen_at": None}) == p
 
 
 class TestUpsert:
@@ -93,6 +98,15 @@ class TestUpsert:
         assert stored.active is False
         assert stored.terms == ["Summer 2027", "Fall 2027"]
         assert stored.degrees == ["Master's", "PhD"]
+
+    def test_first_seen_at_is_assigned_by_the_store_not_the_caller(self):
+        # first_seen_at is None on a freshly-parsed posting -- the store is
+        # the sole authority on "when did we first see this," computed at
+        # insert time, never trusted from the caller.
+        p = make_posting(company="Acme", first_seen_at=None)
+        store.upsert([p])
+        [stored] = store.get_unalerted()
+        assert stored.first_seen_at is not None
 
     def test_existing_row_is_never_overwritten(self):
         original = make_posting(

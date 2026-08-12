@@ -81,7 +81,7 @@ def get_unalerted() -> list[Posting]:
     rows = conn.execute(
         """
         SELECT id, company, title, location, url, source, posted_at,
-               active, terms, degrees, raw
+               active, terms, degrees, first_seen_at, raw
         FROM postings
         WHERE alerted_at IS NULL
         """
@@ -102,7 +102,10 @@ def mark_alerted(ids: list[str]) -> None:
 
 
 def _row_to_posting(row: tuple) -> Posting:
-    id_, company, title, location, url, source, posted_at, active, terms, degrees, raw = row
+    (
+        id_, company, title, location, url, source, posted_at,
+        active, terms, degrees, first_seen_at, raw,
+    ) = row
     return Posting(
         id=id_,
         company=company,
@@ -111,6 +114,7 @@ def _row_to_posting(row: tuple) -> Posting:
         url=url,
         source=source,
         posted_at=datetime.fromisoformat(posted_at) if posted_at else None,
+        first_seen_at=datetime.fromisoformat(first_seen_at) if first_seen_at else None,
         active=bool(active),
         terms=json.loads(terms),
         degrees=json.loads(degrees),
