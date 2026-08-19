@@ -8,7 +8,9 @@ from src import store
 from src.filters import is_eligible
 from src.notify import send
 from src.sources.base import Source
+from src.sources.composite import CompositeSource
 from src.sources.simplify import SimplifySource
+from src.sources.vanshb03 import Vanshb03Source
 
 METRICS_PATH = "metrics.jsonl"
 
@@ -21,7 +23,7 @@ def main(
     db_path: str = store.DEFAULT_DB_PATH,
 ) -> dict:
     start = time.monotonic()
-    source = source or SimplifySource()
+    source = source or CompositeSource([SimplifySource(), Vanshb03Source()])
 
     store.init_db(db_path)
 

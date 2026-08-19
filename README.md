@@ -1,6 +1,7 @@
 # internship-alerts
 
 Watches [SimplifyJobs/Summer2027-Internships](https://github.com/SimplifyJobs/Summer2027-Internships)
+and [vanshb03/Summer2027-Internships](https://github.com/vanshb03/Summer2027-Internships)
 for new SWE internship postings and pings a Discord channel within minutes of a new one
 appearing, so you can apply before the flood. It only discovers and tracks postings —
 it never submits an application for you.
@@ -102,14 +103,22 @@ to the repo so state survives between runs. If you fork this repo:
 src/
   schema.py      # Posting model, canonical ID / normalization
   sources/
-    base.py      # Source protocol -- what any future adapter has to implement
-    simplify.py  # the SimplifyJobs adapter (the only source in v1)
+    base.py      # Source protocol -- what any adapter has to implement
+    simplify.py  # the SimplifyJobs adapter
+    vanshb03.py  # the vanshb03 adapter (Summer-season entries only; see note below)
+    composite.py # CompositeSource -- fans fetch() out across all sources,
+                 # isolates a single source's failure from the others
   store.py       # SQLite persistence and dedupe
   filters.py     # eligibility rules
   notify.py      # Discord embed formatting + delivery
   run.py         # entrypoint: fetch -> dedupe -> filter -> notify -> mark alerted
   config.py      # TARGET_YEAR / LOCATIONS
 ```
+
+vanshb03's listings only carry a bare season (`Summer`/`Fall`/`Winter`/`Spring`), not a
+year, so `sources/vanshb03.py` only ingests `Summer` entries and maps them to `Summer
+2027` -- Fall/Winter/Spring entries are dropped since their year can't be derived from
+the data.
 
 `SPEC.md` is the full technical spec (data model, exact filter rules, failure handling,
 build order). `AGENTS.md` has the rules for anyone (human or agent) making changes here.
