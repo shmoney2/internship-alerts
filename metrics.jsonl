@@ -240,3 +240,4 @@
 {"timestamp": "2026-08-21T03:50:59.280489+00:00", "fetched": 14663, "new": 0, "eligible": 0, "alerted": 0, "duration": 0.89}
 {"timestamp": "2026-08-21T04:39:16.484897+00:00", "fetched": 14663, "new": 0, "eligible": 0, "alerted": 0, "duration": 0.874}
 {"timestamp": "2026-08-21T05:33:32.400540+00:00", "fetched": 14663, "new": 0, "eligible": 0, "alerted": 0, "duration": 0.883}
+{"timestamp": "2026-08-21T06:48:35.696999+00:00", "fetched": 14692, "new": 24, "eligible": 6, "alerted": 6, "duration": 1.505}
