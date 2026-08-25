@@ -368,3 +368,4 @@
 {"timestamp": "2026-08-25T03:49:24.359165+00:00", "fetched": 14942, "new": 3, "eligible": 0, "alerted": 0, "duration": 1.135}
 {"timestamp": "2026-08-25T04:39:20.200336+00:00", "fetched": 14942, "new": 0, "eligible": 0, "alerted": 0, "duration": 1.049}
 {"timestamp": "2026-08-25T05:32:28.265035+00:00", "fetched": 14943, "new": 1, "eligible": 0, "alerted": 0, "duration": 1.527}
+{"timestamp": "2026-08-25T06:49:56.792781+00:00", "fetched": 14959, "new": 10, "eligible": 2, "alerted": 2, "duration": 1.602}
