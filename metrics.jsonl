@@ -714,3 +714,4 @@
 {"timestamp": "2026-10-20T19:52:07.161646+00:00", "fetched": 17637, "new": 17, "eligible": 15, "alerted": 15, "duration": 3.05}
 {"timestamp": "2026-10-20T22:57:50.667198+00:00", "fetched": 17730, "new": 54, "eligible": 21, "alerted": 21, "duration": 4.107}
 {"timestamp": "2026-10-21T01:26:54.674063+00:00", "fetched": 17777, "new": 39, "eligible": 25, "alerted": 25, "duration": 3.805}
+{"timestamp": "2026-10-21T06:26:06.352120+00:00", "fetched": 17791, "new": 15, "eligible": 2, "alerted": 2, "duration": 1.714}
